@@ -22,10 +22,10 @@ teardown() {
 	return 0
 }
 
-@test "fin start" {
+@test "fin project start" {
 	[[ $SKIP == 1 ]] && skip
 	
-	run fin start
+	run fin project start
 	echo "$output" | egrep "Creating network \".*_default\" with the default driver"
 	echo "$output" | egrep "Creating volume \".*_project_root\" with local driver"
 	echo "$output" | egrep "Creating .*_web_1"
@@ -41,7 +41,7 @@ teardown() {
 	unset output
 
 	# Check that containers are running
-	run fin ps
+	run fin project status
 	echo "$output" | grep "web_1" | grep "Up"
 	echo "$output" | grep "db_1" | grep "Up"
 	echo "$output" | grep "cli_1" | grep "Up"
@@ -76,17 +76,17 @@ EOF
 	unset output
 }
 
-@test "fin stop" {
+@test "fin project stop" {
 	[[ $SKIP == 1 ]] && skip
 	
-	run fin stop
+	run fin project stop
 	echo "$output" | egrep "Stopping .*_web_1"
 	echo "$output" | egrep "Stopping .*_db_1"
 	echo "$output" | egrep "Stopping .*_cli_1"
 	unset output
 
 	# Check that containers are stopped
-	run fin ps
+	run fin project status
 	# Sometimes containers would not exit with code 0 (graceful stop), but 137 instead (when docker has to kill the process). 
 	echo "$output" | egrep ".*_web_1 .* (Exit 0|Exit 137)"
 	echo "$output" | egrep ".*_db_1 .* (Exit 0|Exit 137)"
@@ -97,10 +97,10 @@ EOF
 	fin start
 }
 
-@test "fin restart" {
+@test "fin project restart" {
 	[[ $SKIP == 1 ]] && skip
 	
-	run fin restart
+	run fin project restart
 	echo "$output" | egrep "Stopping .*_web_1"
 	echo "$output" | egrep "Stopping .*_db_1"
 	echo "$output" | egrep "Stopping .*_cli_1"
@@ -111,15 +111,57 @@ EOF
 	unset output
 
 	# Check that containers are running
-	run fin ps
+	run fin project status
 	echo "$output" | grep "web_1" | grep "Up"
 	echo "$output" | grep "db_1" | grep "Up"
 	echo "$output" | grep "cli_1" | grep "Up"
 	unset output
 }
 
-@test "fin reset -f" {
+@test "fin project remove web" {
 	[[ $SKIP == 1 ]] && skip
+
+	run fin project remove web
+	echo "$output" | egrep "Killing .*_web_1"
+	echo "$output" | egrep "Removing .*_web_1"
+	unset output
+
+	# Check that containers are running
+	run fin project status
+	[[ $(echo "$output" | grep web | wc -l | tr -d " ") == "0" ]]
+	echo "$output" | grep "db_1" | grep "Up"
+	echo "$output" | grep "cli_1" | grep "Up"
+	unset output
+}
+
+@test "fin project remove --force" {
+	[[ $SKIP == 1 ]] && skip
+
+	# First run
+	run fin rm -f
+	echo "$output" | egrep "Stopping .*_web_1"
+	echo "$output" | egrep "Stopping .*_db_1"
+	echo "$output" | egrep "Stopping .*_cli_1"
+
+	echo "$output" | egrep "Removing .*_web_1"
+	echo "$output" | egrep "Removing .*_db_1"
+	echo "$output" | egrep "Removing .*_cli_1"
+
+	echo "$output" | egrep "Removing network .*_default"
+	echo "$output" | egrep "Removing volume .*_project_root"
+	echo "$output" | grep "Volume docksal_ssh_agent is external, skipping"
+	unset output
+
+	# Check that there are no containers
+	run fin project status
+	[[ "$(echo "$output" | tail -n +3)" == "" ]]
+	unset output
+}
+
+@test "fin project reset -f" {
+	[[ $SKIP == 1 ]] && skip
+
+	fin project start
 	
 	run fin reset -f
 	echo "$output" | egrep "Stopping .*_web_1"
@@ -140,7 +182,7 @@ EOF
 	unset output
 
 	# Check that containers are running
-	run fin ps
+	run fin project status
 	echo "$output" | grep "web_1" | grep "Up"
 	echo "$output" | grep "db_1" | grep "Up"
 	echo "$output" | grep "cli_1" | grep "Up"
@@ -249,30 +291,6 @@ EOF
 	fin rc touch /home/docker/test
 	run fin rc --cleanup -T ls /home/docker/test
 	[[ "$output" == "ls: cannot access '/home/docker/test': No such file or directory" ]]
-	unset output
-}
-
-@test "fin rm -f" {
-	[[ $SKIP == 1 ]] && skip
-	
-	# First run
-	run fin rm -f
-	echo "$output" | egrep "Stopping .*_web_1"
-	echo "$output" | egrep "Stopping .*_db_1"
-	echo "$output" | egrep "Stopping .*_cli_1"
-
-	echo "$output" | egrep "Removing .*_web_1"
-	echo "$output" | egrep "Removing .*_db_1"
-	echo "$output" | egrep "Removing .*_cli_1"
-
-	echo "$output" | egrep "Removing network .*_default"
-	echo "$output" | egrep "Removing volume .*_project_root"
-	echo "$output" | grep "Volume docksal_ssh_agent is external, skipping"
-	unset output
-
-	# Check that there are no containers
-	run fin ps
-	[[ "$(echo "$output" | tail -n +3)" == "" ]]
 	unset output
 }
 
